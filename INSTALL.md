@@ -42,7 +42,15 @@
 | `-LightImage` / `-DarkImage` | 必填 | 背景图绝对路径 |
 | `-MaskOpacity` | `0.30` | 暗纱，0 = 原图，1 = 全遮 |
 | `-SurfaceOpacity` | `0.08` | 面板不透明度，**越小背景越明显** |
+| `-InputOpacity` | `-1`（跟随 surface） | 输入框 |
+| `-TodoOpacity` | `-1`（跟随 surface） | 待办框条 |
+| `-OptionOpacity` | `-1`（跟随 surface） | 答案选项 |
+| `-TodoScope` | `precise` | `precise` 只影响待办框条；`broad` 连同菜单/对话框 |
+| `-OptionScope` | `precise` | `precise` 只影响选项行；`broad` 连同预设卡/选择器 |
 | `-Apply` | 关 | 不加就是干跑 |
+
+三个分区旋钮传负数（默认）就**不写进配置**，于是跟随 `SurfaceOpacity` —— 与只有两个旋钮时的
+行为完全一致。
 
 ⚠️ 脚本**不会**帮你重启 DSH —— profile 配置只在进程启动时读一次，需要手动重启。
 
@@ -78,6 +86,13 @@ Copy-Item "$env:DSH_HOME\profiles\desktop\cordis.patch.yml" `
         darkImage: 'D:/pictures/dark.jpg'
         maskOpacity: 0.30
         surfaceOpacity: 0.08
+        # 可选：三处分区各自的不透明度（不写则跟随 surfaceOpacity）
+        inputOpacity: 0.10
+        todoOpacity: 0.05
+        optionOpacity: 0.15
+        # 可选：作用范围，precise = 只影响这一处（默认），broad = 连同同类表面
+        todoScope: 'precise'
+        optionScope: 'precise'
 ```
 
 **两个必须注意的点**：

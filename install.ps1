@@ -16,6 +16,12 @@ param(
     [Parameter(Mandatory = $true)][string]$DarkImage,
     [double]$MaskOpacity = 0.30,
     [double]$SurfaceOpacity = 0.08,
+    # Region knobs. Use -1 (the default) to omit them and inherit SurfaceOpacity.
+    [double]$InputOpacity = -1,
+    [double]$TodoOpacity = -1,
+    [double]$OptionOpacity = -1,
+    [ValidateSet('precise', 'broad')][string]$TodoScope = 'precise',
+    [ValidateSet('precise', 'broad')][string]$OptionScope = 'precise',
     [switch]$Apply
 )
 
@@ -30,6 +36,9 @@ Say "light     : $LightImage"
 Say "dark      : $DarkImage"
 Say "mask      : $MaskOpacity"
 Say "surface   : $SurfaceOpacity"
+Say "input     : $(if ($InputOpacity -ge 0) { $InputOpacity } else { '(inherit surface)' })"
+Say "todo      : $(if ($TodoOpacity -ge 0) { $TodoOpacity } else { '(inherit surface)' }) scope=$TodoScope"
+Say "option    : $(if ($OptionOpacity -ge 0) { $OptionOpacity } else { '(inherit surface)' }) scope=$OptionScope"
 Say "mode      : $(if ($Apply) { 'APPLY (will write)' } else { 'dry-run' })"
 Say ""
 
@@ -70,6 +79,13 @@ if ($existing -match 'id:\s*desktop-background') {
     $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
     $backup = "$patch.bak_$stamp"
     Say "   backup -> $backup"
+    $region = ""
+    if ($InputOpacity -ge 0) { $region += "        inputOpacity: $InputOpacity`n" }
+    if ($TodoOpacity -ge 0) { $region += "        todoOpacity: $TodoOpacity`n" }
+    if ($OptionOpacity -ge 0) { $region += "        optionOpacity: $OptionOpacity`n" }
+    if ($TodoScope -ne 'precise') { $region += "        todoScope: '$TodoScope'`n" }
+    if ($OptionScope -ne 'precise') { $region += "        optionScope: '$OptionScope'`n" }
+
     $block = @"
 
 # desktop-background: injected by install.ps1
@@ -81,6 +97,7 @@ if ($existing -match 'id:\s*desktop-background') {
         darkImage: '$($DarkImage -replace '\\','/')'
         maskOpacity: $MaskOpacity
         surfaceOpacity: $SurfaceOpacity
+$($region.TrimEnd("`n"))
 "@
     if ($Apply) {
         Copy-Item -LiteralPath $patch -Destination $backup -Force

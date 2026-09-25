@@ -69,26 +69,71 @@ function toDataUri(path) {
   }
 }
 
-// Panel alphas derive from ONE knob, because the app stacks several translucent
-// surfaces (shell -> layout -> conversation -> transcript); the image only
-// survives the PRODUCT of their transmissions, so per-layer alpha must stay
-// small or the picture washes out to flat dark. Extra chrome (sidebar/input)
-// keeps a margin for readability. Measured 2026-09-25: with every layer at 0.45
-// the chat area came out (26,26,30) - indistinguishable from no background.
+// Panel alphas derive from ONE general knob, because the app stacks several
+// translucent surfaces (shell -> layout -> conversation -> transcript); the
+// image only survives the PRODUCT of their transmissions, so per-layer alpha
+// must stay small or the picture washes out to flat dark. Measured 2026-09-25:
+// with every layer at 0.45 the chat area came out (26,26,30) - indistinguishable
+// from no background.
 //
-// The knob itself is the CSS variable --dbg-surface, NOT a baked-in number, so
-// the injected tuning panel can change it at runtime without a restart. All
-// colours and all derived offsets stay here: the client script owns no values.
+// Three regions can then be dialled SEPARATELY, on top of that general knob:
+//   A input   --dsw-specific-input-major      composer + question/approval cards
+//   B todo    --dsw-specific-menu             the todo dock above the composer
+//   C choices --dsw-alias-bg-module-platform  the option rows of a question
+//
+// B and C default to a PRECISE scope: the token is declared ON the target
+// element, so only that element (and its subtree) sees the new value and menus,
+// dialogs and preset cards stay untouched. Setting <region>Scope: 'broad' moves
+// the declaration up to `html body`, which also repaints every other surface
+// that shares the token.
+//
+// Every knob is a CSS variable, never a baked number, so the injected tuning
+// panel can change it at runtime without a restart. All colours live here: the
+// client script owns no design values.
 function surfaceBlock(hex) {
-  const alpha = (expr) => `rgb(${hex.base} / ${expr})`;
   return [
-    `--dsw-alias-bg-base:${alpha('var(--dbg-surface)')}`,
+    `--dsw-alias-bg-base:rgb(${hex.base} / var(--dbg-surface))`,
     `--dsw-specific-tip:rgb(${hex.tip} / var(--dbg-surface))`,
     `--dsw-specific-bubble:rgb(${hex.bubble} / var(--dbg-surface))`,
     `--dsw-specific-bubble-highlight:rgb(${hex.highlight} / var(--dbg-surface))`,
     `--dsw-specific-sidebar-fill:rgb(${hex.sidebar} / min(1, calc(var(--dbg-surface) + 0.15)))`,
-    `--dsw-specific-input-major:rgb(${hex.input} / min(1, calc(var(--dbg-surface) + 0.35)))`,
   ].join('!important;') + '!important';
+}
+
+/** A: the input box. The question and approval cards share this same token. */
+function inputBlock(hex) {
+  return `--dsw-specific-input-major:rgb(${hex.input} / var(--dbg-input))!important`;
+}
+
+/**
+ * B and C in precise scope: declare the token on the target element itself, so
+ * the override cannot leak to menus/dialogs/preset cards.
+ *   B target: [data-testid="todo-panel"]  (owner: ui-conversation TodoPanel)
+ *   C target: [data-question-key]         (owner: ui-user-questions composer)
+ */
+function preciseRegionRules(light, dark) {
+  return [
+    `[data-testid="todo-panel"]{--dsw-specific-menu:rgb(${light.menu} / var(--dbg-todo))!important}`,
+    `html:has(body[data-ds-dark-theme]) [data-testid="todo-panel"]{--dsw-specific-menu:rgb(${dark.menu} / var(--dbg-todo))!important}`,
+    `[data-question-key]{--dsw-alias-bg-module-platform:rgb(${light.module} / var(--dbg-option))!important}`,
+    `html:has(body[data-ds-dark-theme]) [data-question-key]{--dsw-alias-bg-module-platform:rgb(${dark.module} / var(--dbg-option))!important}`,
+  ].join('');
+}
+
+/**
+ * B and C in broad scope: the same declarations hoisted to `html body`, but
+ * gated behind an attribute the tuning panel toggles. Gating (rather than
+ * branching at build time) is what lets the panel switch scope live - and if
+ * the script never runs, the attributes stay absent and only the precise rules
+ * apply, which is the safe default.
+ */
+function broadRegionRules(light, dark) {
+  return [
+    `html[data-dbg-todo-broad="1"] body{--dsw-specific-menu:rgb(${light.menu} / var(--dbg-todo))!important}`,
+    `html[data-dbg-todo-broad="1"] body[data-ds-dark-theme]{--dsw-specific-menu:rgb(${dark.menu} / var(--dbg-todo))!important}`,
+    `html[data-dbg-option-broad="1"] body{--dsw-alias-bg-module-platform:rgb(${light.module} / var(--dbg-option))!important}`,
+    `html[data-dbg-option-broad="1"] body[data-ds-dark-theme]{--dsw-alias-bg-module-platform:rgb(${dark.module} / var(--dbg-option))!important}`,
+  ].join('');
 }
 
 // Space-separated channels on purpose: these feed the modern `rgb(R G B / a)`
@@ -100,6 +145,8 @@ const LIGHT_HEX = {
   highlight: '211 226 255',
   sidebar: '249 250 251',
   input: '255 255 255',
+  menu: '255 255 255',
+  module: '245 246 247',
 };
 
 const DARK_HEX = {
@@ -109,6 +156,8 @@ const DARK_HEX = {
   highlight: '53 54 56',
   sidebar: '16 16 20',
   input: '44 44 46',
+  menu: '44 44 46',
+  module: '30 30 34',
 };
 
 /** Compose the stylesheet; returns null when there is no usable image. */
@@ -116,6 +165,13 @@ export function buildCss(config) {
   const cfg = config && typeof config === 'object' ? config : {};
   const mask = clamp01(cfg.maskOpacity, 0.35);
   const surface = clamp01(cfg.surfaceOpacity, 0.10);
+  // The three region knobs fall back to the general one, so omitting them keeps
+  // the previous behaviour byte for byte.
+  const input = clamp01(cfg.inputOpacity, surface);
+  const todo = clamp01(cfg.todoOpacity, surface);
+  const option = clamp01(cfg.optionOpacity, surface);
+  const todoScope = cfg.todoScope === 'broad' ? 'broad' : 'precise';
+  const optionScope = cfg.optionScope === 'broad' ? 'broad' : 'precise';
 
   const darkFile = toDataUri(cfg.darkImage);
   const lightFile = toDataUri(cfg.lightImage);
@@ -142,8 +198,6 @@ export function buildCss(config) {
   // The mask is a flat translucent layer stacked over the image on the canvas,
   // so no pseudo-element and no z-index trickery is involved; body is made
   // transparent so the canvas is actually visible behind the app surfaces.
-  // `maskOpacity` softens the picture for contrast; `surfaceOpacity` decides how
-  // much of it survives the stacked panels. They are separate knobs on purpose.
   const css = [
     ':root{',
     `--dbg-image-light:url("${lightUri}");`,
@@ -151,6 +205,9 @@ export function buildCss(config) {
     `--dbg-mask-light:rgba(255,255,255,${mask.toFixed(3)});`,
     `--dbg-mask-dark:rgba(9,9,13,${mask.toFixed(3)});`,
     `--dbg-surface:${surface.toFixed(3)};`,
+    `--dbg-input:${input.toFixed(3)};`,
+    `--dbg-todo:${todo.toFixed(3)};`,
+    `--dbg-option:${option.toFixed(3)};`,
     '}',
     'html{',
     '--dbg-image:var(--dbg-image-light)!important;',
@@ -167,8 +224,10 @@ export function buildCss(config) {
     '--dbg-mask:var(--dbg-mask-dark)!important;',
     '}',
     'body{background-color:transparent!important;}',
-    `html body{${surfaceBlock(LIGHT_HEX)}}`,
-    `html body[data-ds-dark-theme]{${surfaceBlock(DARK_HEX)}}`,
+    `html body{${surfaceBlock(LIGHT_HEX)};${inputBlock(LIGHT_HEX)}}`,
+    `html body[data-ds-dark-theme]{${surfaceBlock(DARK_HEX)};${inputBlock(DARK_HEX)}}`,
+    preciseRegionRules(LIGHT_HEX, DARK_HEX),
+    broadRegionRules(LIGHT_HEX, DARK_HEX),
   ].join('');
 
   return {
@@ -177,6 +236,11 @@ export function buildCss(config) {
       event: 'bg-built',
       maskOpacity: mask,
       surfaceOpacity: surface,
+      inputOpacity: input,
+      todoOpacity: todo,
+      optionOpacity: option,
+      todoScope,
+      optionScope,
       darkReason: chosenDark.reason,
       lightReason: chosenLight.reason,
       darkBytes: chosenDark.bytes ?? 0,
@@ -206,12 +270,18 @@ export function buildRows(config) {
 
   const rows = [{ kind: 'style', text: css }];
   try {
+    const surface = clamp01(cfg.surfaceOpacity, 0.10);
     rows.push({
       kind: 'script',
       placement: 'body',
       text: buildClientScript({
         mask: clamp01(cfg.maskOpacity, 0.35),
-        surface: clamp01(cfg.surfaceOpacity, 0.10),
+        surface,
+        input: clamp01(cfg.inputOpacity, surface),
+        todo: clamp01(cfg.todoOpacity, surface),
+        option: clamp01(cfg.optionOpacity, surface),
+        todoScope: cfg.todoScope === 'broad' ? 'broad' : 'precise',
+        optionScope: cfg.optionScope === 'broad' ? 'broad' : 'precise',
       }),
     });
   } catch (error) {
