@@ -76,8 +76,22 @@ DSH 桌面窗口的 `index.html` **不经过宿主 web server**：
 
 `broad` 把同一份声明提升到 `html body`，于是**所有共用该 token 的表面**一起变：
 
-- B 用的 `--dsw-specific-menu` 同时是**所有菜单与对话框**的底
-- C 用的 `--dsw-alias-bg-module-platform` 同时被 **agent 预设卡、模型选择器、告警条**用
+- B 会同时改写 **`--dsw-specific-menu` 和 `--dsw-menu-surface-fill` 两个名字**。⚠️ 这里踩过坑：
+  主题里 `--dsw-specific-menu` 只是 **`--dsw-menu-surface-fill` 的别名**
+  （`--dsw-specific-menu: var(--dsw-menu-surface-fill)`），而前端外壳里共享的菜单材质直接消费
+  **别名背后的真身**：
+
+  ```css
+  .material { background: var(--dsw-menu-surface-fill) }
+  ```
+
+  只改别名时，真正吃真身的菜单与对话框**一动不动** —— 表现为「勾了『同类一起变』却什么都没发生」。
+  两个都写，菜单与对话框才会跟着变。
+- C 改写 `--dsw-alias-bg-module-platform`，它同时被 **agent 预设卡、模型选择器、轨迹视图、
+  快捷键面板、设置页**等约 15 个包消费。
+
+> ⚠️ 所以 `broad` 的效果**不在你正盯着的那一处**（那一处由 `precise` 规则管，两种模式下长得一样），
+> 而在**别处的同类表面**上。勾上之后，请打开一个菜单或对话框来看效果。
 
 两种模式都已生成为 CSS 规则，`broad` 那组由 `<html>` 上的属性门控，因此**切换范围是实时的**。
 

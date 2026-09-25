@@ -151,8 +151,8 @@
     { key: 'mask', label: '暗纱 mask' },
     { key: 'surface', label: '面板 surface' },
     { key: 'input', label: '输入框', section: '分区微调（不设则跟随面板）' },
-    { key: 'todo', label: '待办框条', scope: 'todoScope' },
-    { key: 'option', label: '答案选项', scope: 'optionScope' },
+    { key: 'todo', label: '待办框条', scope: 'todoScope', scopeHint: '菜单 / 对话框也跟变' },
+    { key: 'option', label: '答案选项', scope: 'optionScope', scopeHint: '预设卡 / 选择器也跟变' },
   ];
 
   function sync() {
@@ -201,7 +201,7 @@
         '<span class="v" data-v="' + s.key + '"></span></div>';
       if (s.scope) {
         html += '<label class="s"><input type="checkbox" data-scope="' + s.scope + '">' +
-          '同类一起变（否则只影响这一处）</label>';
+          '同类一起变' + (s.scopeHint ? '（' + s.scopeHint + '）' : '') + '</label>';
       }
     }
     return html;

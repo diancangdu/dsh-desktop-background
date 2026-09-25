@@ -128,11 +128,20 @@ function preciseRegionRules(light, dark) {
  * apply, which is the safe default.
  */
 function broadRegionRules(light, dark) {
+  // B must set BOTH names: `--dsw-specific-menu` is only an alias of
+  // `--dsw-menu-surface-fill` (theme: specific-menu: var(menu-surface-fill)),
+  // the shared menu material in the frontend shell consumes the FILL directly,
+  // and ten UI packages consume the alias. Setting only the alias leaves every
+  // real menu and dialog untouched - measured 2026-09-25.
+  const menu = (hex) =>
+    `--dsw-specific-menu:rgb(${hex.menu} / var(--dbg-todo))!important;` +
+    `--dsw-menu-surface-fill:rgb(${hex.menu} / var(--dbg-todo))!important`;
+  const module = (hex) => `--dsw-alias-bg-module-platform:rgb(${hex.module} / var(--dbg-option))!important`;
   return [
-    `html[data-dbg-todo-broad="1"] body{--dsw-specific-menu:rgb(${light.menu} / var(--dbg-todo))!important}`,
-    `html[data-dbg-todo-broad="1"] body[data-ds-dark-theme]{--dsw-specific-menu:rgb(${dark.menu} / var(--dbg-todo))!important}`,
-    `html[data-dbg-option-broad="1"] body{--dsw-alias-bg-module-platform:rgb(${light.module} / var(--dbg-option))!important}`,
-    `html[data-dbg-option-broad="1"] body[data-ds-dark-theme]{--dsw-alias-bg-module-platform:rgb(${dark.module} / var(--dbg-option))!important}`,
+    `html[data-dbg-todo-broad="1"] body{${menu(light)}}`,
+    `html[data-dbg-todo-broad="1"] body[data-ds-dark-theme]{${menu(dark)}}`,
+    `html[data-dbg-option-broad="1"] body{${module(light)}}`,
+    `html[data-dbg-option-broad="1"] body[data-ds-dark-theme]{${module(dark)}}`,
   ].join('');
 }
 
