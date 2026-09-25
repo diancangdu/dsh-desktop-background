@@ -4,6 +4,8 @@
 
 零外部依赖、零网络请求。
 
+**当前版本：`v1.0.0`** —— 已在实际的 DSH 桌面端验证有效。变更历史见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 为什么需要它（而不是随便找个主题插件）
 
 DSH 桌面窗口的 `index.html` **不经过宿主 web server**：
